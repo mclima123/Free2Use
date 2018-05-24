@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.0/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.0/js/bootstrap.min.js"></script>
+  <script src="../javascript/scripts.js"></script>
+  <title>Free2Use - Técnico</title>
+</head>
+
+<body>
+
+  <div class="container-fluid" style="background-color: rgb(26, 26, 26)">
+    <div class="row align-items-center">
+      <div class="col-md-5">
+        <h4>
+          <a href="tecnico_fechar_sala.html" style="color: rgb(199, 199, 199); text-decoration: none">Free2Use</a>
+          <small class="text-white-50">Sistema de Gestão de Salas de Estudo</small>
+        </h4>
+      </div>
+      <div class="col-md-6 text-white-50" id="nome_num_top" style="text-align: right"></div>
+      <div class="col-md-1 text-white-50" style="text-align: right">
+        <a href="login.html" class="text-white-50">Sair</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="padding-bottom: 2%; padding-top: 5%">
+    <div class="row">
+      <div class="col-md-4"></div>
+      <div class="col-md-4" style="background-color: gainsboro; padding-bottom: 10px; border-radius: 10px">
+        <h3 style="text-align: center">Fechar Sala para Manutenção</h3>
+
+        <form action="tecnico_fechar_sala.html" id="myForm">
+          <div class="form-group">
+            <label for="salaPicker">Escolha a sala:</label>
+            <input type="number" min="0" step="0.001" placeholder="Insira o número da sala" class="form-control" id="salaPicker">
+          </div>
+          <div class="form-group">
+            <label for="datePicker">Escolha a data:</label>
+            <input type="date" max="3000-12-31" class="form-control" id="datePicker">
+          </div>
+          <div class="form-group">
+            <label for="timePicker_start">Escolha a hora de início (slots de 30 min):</label>
+            <input type="time" class="form-control" id="timePicker_start" step="1800">
+          </div>
+          <div class="form-group">
+            <label for="timePicker_end">Escolha a hora de fim (slots de 30 min):</label>
+            <input type="time" class="form-control" id="timePicker_end" step="1800">
+          </div>
+
+          <button type="submit" class="btn btn-dark btn-block">Agendar</button>
+        </form>
+
+      </div>
+      <div class="col-md-4"></div>
+    </div>
+  </div>
+
+  <!--resto aqui-->
+
+  <!--scripts-->
+
+  <script>
+    $(document).ready(function () {
+      redirectLogin();
+      setTextoTop('tecnico');
+
+      console.log(loadListaReservasInd());
+      console.log(loadListaReservasGrupo());
+    });
+
+    var hora_fecho_start;
+    var hora_fecho_end;
+    var sala_fecho;
+    var data_fecho;
+
+    function camposPreenchidos() {
+      //devolve true se todos os campos estao preenchidos
+      sala_fecho = $('#salaPicker').val();
+      data_fecho = $('#datePicker').val();
+      hora_fecho_start = $('#timePicker_start').val();
+      hora_fecho_end = $('#timePicker_end').val();
+
+      if (sala_fecho === '' || data_fecho === '' || hora_fecho_start === '' || hora_fecho_end === '') {
+        return false;
+      }
+      else {
+        return true;
+      }
+    }
+    //ao carregar no botão "Agendar"
+    $('#myForm').on('submit', function (e) {
+      e.preventDefault();
+
+      //validação
+      if (!camposPreenchidos()) {
+        window.alert('Preencha todos os campos!');
+      }
+      else if (dataHoje($('#datePicker').val()) && !horaValida($('#timePicker_start').val())){
+        window.alert('Escolha um intervalo de horas válido!');
+      }
+      else if ($('#timePicker_end').val() <= $('#timePicker_start').val()) {
+        window.alert('Escolha um intervalo de horas válido!');
+      }
+      else {
+        //cancelar as reservas
+
+        var listaReservasInd = loadListaReservasInd();
+        var listaReservasGrupo = loadListaReservasGrupo();
+        cancelarReservasInd();
+        cancelarReservasGrupo();
+
+        console.log(loadListaReservasInd());
+        console.log(loadListaNotifications());
+
+        window.alert('Fecho da sala agendado com sucesso!');
+        this.submit();
+      }
+    });
+
+    function cancelarReservasInd() {
+      var hora_reserva_start;
+      var hora_reserva_end;
+      var lista_final = [];
+      var fecho = {
+        sala: sala_fecho,
+        data: data_fecho,
+        hora_init: hora_fecho_start,
+        hora_end: hora_fecho_end
+      };
+      console.log(fecho);
+
+      var id;
+
+      if (localStorage.getItem('id_notificacao')) {
+        id = localStorage.getItem('id_notificacao');
+      }
+      else {
+        id = 0;
+      }
+      //console.log(id);
+
+      var lista_inicial = loadListaReservasInd();
+
+      for (var i = 0; i < lista_inicial.length; i++) {
+        var lista_notifications = loadListaNotifications();
+        var notification = newNotification();
+
+        if (!intersetaFechoSala(lista_inicial[i], fecho)) {
+          //console.log(lista_inicial[i]);
+          lista_final.push(lista_inicial[i]);
+        }
+        else {
+          notification.user = lista_inicial[i].user;
+          notification.id = id;
+          id++;
+          notification.tipo = 'Reserva cancelada: ' + lista_inicial[i].tipo;
+          notification.descricao = lista_inicial[i].data + ' | ' + lista_inicial[i].hora_init + ' | ' + lista_inicial[i].hora_end;
+          console.log(notification);
+          lista_notifications.push(notification);
+        }
+        saveListaNotifications(lista_notifications);
+      }
+      saveListaReservasInd(lista_final);
+      localStorage.setItem('id_notificacao', id);
+    }
+
+    function cancelarReservasGrupo() {
+      var hora_reserva_start;
+      var hora_reserva_end;
+      var lista_final = [];
+      var fecho = {
+        sala: sala_fecho,
+        data: data_fecho,
+        hora_init: hora_fecho_start,
+        hora_end: hora_fecho_end
+      };
+      console.log(fecho);
+
+      var id;
+
+      if (localStorage.getItem('id_notificacao')) {
+        id = localStorage.getItem('id_notificacao');
+      }
+      else {
+        id = 0;
+      }
+      //console.log(id);
+
+      var lista_inicial = loadListaReservasGrupo();
+      //console.log(lista_inicial);
+
+      for (var i = 0; i < lista_inicial.length; i++) {
+        var lista_notifications = loadListaNotifications();
+        var notification = newNotification();
+
+        if (!intersetaFechoSala(lista_inicial[i], fecho)) {
+          //console.log(lista_inicial[i]);
+          lista_final.push(lista_inicial[i]);
+          //console.log(lista_inicial[i]);
+        }
+        else {
+          notification.user = lista_inicial[i].user;
+          notification.id = id;
+          id++;
+          notification.tipo = 'Reserva pendente cancelada: ' + lista_inicial[i].tipo;
+          notification.descricao = lista_inicial[i].data + ' | ' + lista_inicial[i].hora_init + ' | ' + lista_inicial[i].hora_end;
+          console.log(notification);
+          lista_notifications.push(notification);
+        }
+        saveListaNotifications(lista_notifications);
+      }
+      saveListaReservasGrupo(lista_final);
+      localStorage.setItem('id_notificacao', id);
+    }
+  </script>
+
+</body>
+
+</html>
